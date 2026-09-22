@@ -202,3 +202,24 @@ The document was inserted and retrieved successfully, confirming that MongoDB is
 docker compose down      # stops and removes containers, keeps the volumes (data is preserved)
 docker compose down -v   # also removes the volumes (all MongoDB data is deleted)
 ```
+
+## Part 4: Publish to Docker Hub
+
+**Docker Hub repository:** [hub.docker.com/r/marianamalagon11/virtualization-lab](https://hub.docker.com/r/marianamalagon11/virtualization-lab)
+
+Log in, tag the image as `latest` in addition to `1.0`, and push both tags:
+
+```bash
+docker login
+docker tag marianamalagon11/virtualization-lab:1.0 marianamalagon11/virtualization-lab:latest
+docker push marianamalagon11/virtualization-lab:1.0
+docker push marianamalagon11/virtualization-lab:latest
+```
+
+![docker login, tag, and push output](images/04-push.png)
+
+The repository appears under the account with both tags:
+
+![Docker Hub repository listing](images/04-dockerhub-repo.png)
+
+![Docker Hub tags: 1.0 and latest](images/04-dockerhub-tags.png)
