@@ -131,3 +131,74 @@ http://localhost:34002/greeting?name=Container3  -> Hello, Container3!
 ```
 
 ![Side-by-side browser evidence: container 2 and container 3 responding independently](images/02-evidence4.png)
+
+## Part 3: Multi-container environment with Docker Compose
+
+Docker Compose defines and runs the application environment with two services on the same Docker network: the Spring Boot app (`web`) and a MongoDB database (`db`). The application does not persist data in MongoDB yet. The `db` service exists to show how Compose manages multiple services, networking, port mappings, and persistent volumes (see [compose.yaml](compose.yaml)).
+
+The `web` service is built from the local `Dockerfile`, and the `db` service uses the official `mongo:8` image. The `web` container can reach MongoDB through the hostname `db`, which is the Compose service name, since Compose creates the internal network automatically. Two named volumes (`mongodb`, `mongodb_config`) preserve MongoDB's data independently of the container lifecycle.
+
+### Build and start both services
+
+```bash
+docker compose up -d --build
+```
+
+![docker compose up output](images/03-evidence1.png)
+
+### Verify both containers are running
+
+```bash
+docker compose ps
+```
+
+![docker compose ps output](images/03-compose-ps.png)
+
+### Inspect the logs
+
+```bash
+docker compose logs web
+```
+
+![web service logs](images/03-logs-web.png)
+
+```bash
+docker compose logs db
+```
+
+![db service logs](images/03-logs-db.png)
+
+### Verify the web application
+
+```
+http://localhost:8087/greeting?name=Compose
+```
+
+![Browser test of the Compose web service](images/03-browser-compose.png)
+
+### Connect to MongoDB directly
+
+To confirm the `db` service works independently of the application, connect to its shell and run a few basic operations:
+
+```bash
+docker compose exec db mongosh
+```
+
+```
+show dbs
+use workshop
+db.messages.insertOne({ message: "Hello from Docker Compose" })
+db.messages.find()
+exit
+```
+
+![mongosh session: show dbs, insertOne, and find](images/03-mongosh.png)
+
+The document was inserted and retrieved successfully, confirming that MongoDB is running and reachable inside its own container.
+
+### Stopping the environment
+
+```bash
+docker compose down      # stops and removes containers, keeps the volumes (data is preserved)
+docker compose down -v   # also removes the volumes (all MongoDB data is deleted)
+```
