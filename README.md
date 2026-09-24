@@ -6,6 +6,10 @@ Mariana Malagón
 
 This project explores virtualization as an architectural mechanism for modularity, isolation, portability, and deployment. It implements a small Java web application built with Spring Boot, packaged as a Docker image, run locally in isolated containers, published to Docker Hub, and deployed on an Amazon EC2 virtual machine.
 
+## Video demo
+
+[Local Docker deployment and AWS EC2 deployment walkthrough](https://youtu.be/ae8Owzvak58)
+
 ## Technology stack
 
 - Java 21 LTS
