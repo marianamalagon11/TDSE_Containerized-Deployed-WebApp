@@ -223,3 +223,64 @@ The repository appears under the account with both tags:
 ![Docker Hub repository listing](images/04-dockerhub-repo.png)
 
 ![Docker Hub tags: 1.0 and latest](images/04-dockerhub-tags.png)
+
+## Part 5: Deploy on AWS EC2
+
+**Instance:** Amazon Linux 2023, `t3.micro`, region `us-east-1` (N. Virginia).
+
+**Security group:**
+- SSH (port 22): restricted to the developer's public IP.
+- Custom TCP (port 8080): open to allow testing the application from any network.
+
+### Connect and install Docker
+
+```bash
+ssh -i firstKey.pem ec2-user@<ec2-public-ip>
+```
+
+![First successful SSH connection to the EC2 instance](images/05-ssh-connect.png)
+
+```bash
+sudo yum update -y
+sudo yum install -y docker
+sudo service docker start
+sudo usermod -a -G docker ec2-user
+```
+
+After adding `ec2-user` to the `docker` group, the SSH session was closed and reopened so the new group membership takes effect.
+
+### Pull and run the image
+
+```bash
+docker pull marianamalagon11/virtualization-lab:1.0
+
+docker run -d \
+  --name virtualization-lab \
+  --restart unless-stopped \
+  -e PORT=6000 \
+  -p 8080:6000 \
+  marianamalagon11/virtualization-lab:1.0
+```
+
+![docker pull and docker run on the EC2 instance](images/05-pull-run.png)
+
+### Verify the deployment
+
+```bash
+docker ps
+docker logs virtualization-lab
+```
+
+![docker ps and docker logs output on EC2](images/05-docker-ps-logs1.png)
+
+![docker logs output continued, showing Spring Boot started successfully](images/05-docker-ps-logs2.png)
+
+### Public deployment URL
+
+```
+http://<ec2-public-dns>:8080/greeting?name=AWS
+```
+
+![Browser test of the deployed application on EC2](images/05-browser-aws.png)
+
+The application responded `Hello, AWS!` from the public EC2 instance, confirming a successful cloud deployment.
