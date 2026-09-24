@@ -278,9 +278,92 @@ docker logs virtualization-lab
 ### Public deployment URL
 
 ```
-http://<ec2-public-dns>:8080/greeting?name=AWS
+http://<ec2-public-ip>:8080/greeting?name=AWS
 ```
 
 ![Browser test of the deployed application on EC2](images/05-browser-aws.png)
 
 The application responded `Hello, AWS!` from the public EC2 instance, confirming a successful cloud deployment.
+
+Note: this project's EC2 instance does not use an Elastic IP, so its public IP can change if the instance is stopped and restarted. The IP shown above reflects the instance at the time of testing.
+
+## Part 6: Deployment model and cost analysis
+
+### Deployment model
+
+```
+Client
+  | HTTP request
+  v
+EC2 virtual machine
+  v
+Docker Engine
+  v
+Java web application container
+```
+
+**Layer responsibilities:**
+
+- **EC2 virtual machine:** isolated compute, memory, storage, and network resources rented by the hour.
+- **Docker container:** a portable execution environment containing the application and its runtime dependencies.
+- **Java web application:** receives HTTP requests and provides the business functionality (the `/greeting` endpoint).
+- **Security group:** controls which inbound traffic can reach the virtual machine (in this deployment, SSH restricted to the developer's IP, and the application port open for testing).
+
+### Workload assumptions
+
+| | Small workload | Medium workload | Large workload |
+|---|---|---|---|
+| Monthly requests | 10,000 | 100,000 | 1,000,000 |
+| AWS Region | US East (N. Virginia) | US East (N. Virginia) | US East (N. Virginia) |
+| EC2 instance type | t3.micro | t3.small | t3.medium |
+| Number of instances | 1 | 1 | 1 |
+| Monthly runtime | 730 hours (continuous) | 730 hours (continuous) | 730 hours (continuous) |
+| EBS storage | 8 GB gp3 | 10 GB gp3 | 20 GB gp3 |
+| Estimated outbound data transfer | 1 GB | 5 GB | 15 GB |
+| Avg. request/response size | Small (a few hundred bytes for this endpoint) | Small (a few hundred bytes) | Small (a few hundred bytes) |
+| Runs continuously or scheduled | Continuously | Continuously | Continuously |
+| Requires high availability | No | No | Not for this workload volume, though it is the scenario closest to justifying a second instance |
+
+All three scenarios stay under the 100 GB/month free outbound data transfer allowance, so data transfer does not add cost in any of them.
+
+### Cost estimate (AWS Pricing Calculator)
+
+![AWS Pricing Calculator summary for the three scenarios](images/06-calculator-summary.png)
+
+![AWS Pricing Calculator detailed estimate export](images/06-calculator-export.png)
+
+### Cost analysis table
+
+| Scenario | Monthly requests | Monthly infrastructure cost | Estimated cost per request | Main cost drivers |
+|---|---|---|---|---|
+| Small workload | 10,000 | $8.32 | $0.000832 | EC2 runtime and storage |
+| Medium workload | 100,000 | $16.43 | $0.0001643 | EC2 runtime and storage (larger instance) |
+| Large workload | 1,000,000 | $33.32 | $0.0000333 | Instance capacity and storage |
+
+Estimated cost per request = monthly infrastructure cost / monthly requests.
+
+### Architectural discussion
+
+**Why does an EC2-based deployment have a baseline monthly cost even when the application receives few requests?**
+
+An EC2 instance is billed by the hour it is running, not by the number of requests it handles. Even with zero traffic, the instance still occupies compute, memory, and storage resources that AWS has reserved, so the bill only goes to zero if the instance is stopped. This is why the Small workload still costs over $8/month despite receiving only about 14 requests per day.
+
+**At which workload level does the fixed cost become less significant per request?**
+
+Looking at the cost-per-request column, it drops from $0.00083 (Small) to $0.0000333 (Large), a 25x reduction. The fixed cost of running the instance stays roughly constant (it grows a bit because a larger instance type is needed), while it gets divided across far more requests. The Large workload is where the fixed cost becomes negligible per request, since the infrastructure cost barely grows compared to the 100x increase in traffic.
+
+**What would force you to move from one EC2 instance to multiple instances?**
+
+Mainly two things: the instance running out of CPU, memory, or network capacity for the incoming traffic, and the need for fault tolerance (a single instance is a single point of failure, if it crashes or the underlying host has a problem, the application goes down completely). At very high or spiky traffic, or when uptime guarantees matter, a second instance behind a load balancer becomes necessary.
+
+**Which additional services would a production deployment likely require?**
+
+A load balancer to distribute traffic and provide failover across multiple instances, a managed database (such as Amazon RDS or DocumentDB, instead of running MongoDB in a container with no backups), CloudWatch for monitoring and alerting, automated EBS snapshots for backups, and a container registry such as Amazon ECR (instead of relying solely on Docker Hub) if the deployment moves toward an orchestrated environment like ECS or EKS.
+
+**Would a serverless deployment be more cost-effective for the small-workload scenario?**
+
+Likely yes, for this specific case. The small workload receives about 10,000 requests a month, roughly one request every four minutes on average, with the application idle almost all the time. A service like AWS Lambda only charges for the time spent actually processing a request, not for idle hours, so at this traffic level a serverless deployment would probably cost a fraction of the ~$8.32/month EC2 baseline, since there is no idle capacity to pay for. This advantage shrinks as traffic grows and the workload becomes more constant, which is why EC2 becomes more competitive at the Medium and Large workload levels.
+
+### Conclusion
+
+For the Large workload (1,000,000 requests/month), EC2 is an appropriate choice: traffic is high and steady enough that a continuously running instance is well utilized, and the cost per request is already very low ($0.0000333). For the Small workload, EC2 still works and is simple to reason about, but it carries a fixed cost that is mostly idle capacity, so a serverless approach would likely be more cost-effective at that specific volume.
