@@ -282,7 +282,7 @@ docker logs virtualization-lab
 ### Public deployment URL
 
 ```
-http://<ec2-public-ip>:8080/greeting?name=AWS
+http://98.81.173.156:8080/greeting?name=AWS
 ```
 
 ![Browser test of the deployed application on EC2](images/05-browser-aws.png)
